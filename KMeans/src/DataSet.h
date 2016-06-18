@@ -24,10 +24,10 @@ public:
 	void parseData(vector<string>& input);
 	void print();
 
-	inline vector<double> const getX() const {return _x;};
-	inline vector<double> const getY() const {return _y;};
-	inline vector<double> const getZ() const {return _z;};
-	inline vector<int> const getK() const {return _k;};
+	inline vector<double> const & getX() const {return _x;};
+	inline vector<double> const & getY() const {return _y;};
+	inline vector<double> const & getZ() const {return _z;};
+	inline vector<int> const & getK() const {return _k;};
 	inline void setX(const vector<double> x) {_x = x;};
 	inline void setY(const vector<double> y) {_y = y;};
 	inline void setZ(const vector<double> z) {_z = z;};

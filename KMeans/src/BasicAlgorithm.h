@@ -24,8 +24,8 @@ public:
 	DataSet findCentroids(DataSet& data, unsigned int K);
 
 private:
-	inline vector<double> subtractScalar(const vector<double>& x, double mu) {vector<double> r; r.resize(x.size()); transform(x.begin(), x.end(), r.begin(), bind2nd(minus<double>(), mu)); return r;};
-	inline vector<double> square(const vector<double>& v) {vector<double> r; r.resize(v.size()); transform( v.begin(), v.end(), v.begin(), r.begin(), multiplies<double>()); return r;};
+	inline vector<double> subtractScalar(const vector<double>& x, double mu) {vector<double> r; transform(x.begin(), x.end(), back_inserter(r), bind2nd(minus<double>(), mu)); return r;};
+	inline vector<double> square(const vector<double>& v) {vector<double> r; transform( v.begin(), v.end(), v.begin(), back_inserter(r), multiplies<double>()); return r;};
 
 	/// Random assignment of centroids
 	void randomCentroids(const DataSet& data, DataSet& centroids);
@@ -35,6 +35,9 @@ private:
 
 	/// Assign centroid to points and return the cost
 	double assignCentroids(DataSet& data, const DataSet& centroids);
+
+	/// Assign centroid to points and return the cost
+	double assignCentroidsBruteForce(DataSet& data, const DataSet& centroids);
 
 	/// Update the centroids after point assignment
 	void updateCentroids(const DataSet& data, DataSet& centroids);
