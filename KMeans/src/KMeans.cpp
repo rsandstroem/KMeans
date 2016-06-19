@@ -15,7 +15,6 @@
 #include <functional>
 #include <algorithm>
 
-#include "DataSet.h"
 #include "DataPoint.h"
 #include "BasicAlgorithm.h"
 

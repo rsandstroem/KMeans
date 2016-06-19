@@ -10,7 +10,6 @@
 
 #include <vector>
 #include <algorithm>
-#include "DataSet.h"
 #include "DataPoint.h"
 
 using namespace std;
