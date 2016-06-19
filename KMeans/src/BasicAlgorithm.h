@@ -11,6 +11,7 @@
 #include <vector>
 #include <algorithm>
 #include "DataSet.h"
+#include "DataPoint.h"
 
 using namespace std;
 
@@ -21,30 +22,23 @@ public:
 
 	/// For a give data set "data", find return the K centroids representing
 	/// the clusters of "data", using the same formatting as the input data.
-	DataSet findCentroids(DataSet& data, unsigned int K);
+	vector<DataPoint> findCentroids(vector<DataPoint>& data, unsigned int K);
 
 private:
-	inline vector<double> subtractScalar(const vector<double>& x, double mu) {vector<double> r; transform(x.begin(), x.end(), back_inserter(r), bind2nd(minus<double>(), mu)); return r;};
-	inline vector<double> square(const vector<double>& v) {vector<double> r; transform( v.begin(), v.end(), v.begin(), back_inserter(r), multiplies<double>()); return r;};
-
 	/// Random assignment of centroids
-	void randomCentroids(const DataSet& data, DataSet& centroids);
-
-	/// Distance between a vector and a scalar in one dimension
-	double squareDistance1D(vector<double>, double);
+	void randomCentroids(const vector<DataPoint>& data, vector<DataPoint>& centroids);
 
 	/// Assign centroid to points and return the cost
-	double assignCentroids(DataSet& data, const DataSet& centroids);
+	double assignCentroids(vector<DataPoint>& data, const vector<DataPoint>& centroids);
 
-	/// Assign centroid to points and return the cost
-	double assignCentroidsBruteForce(DataSet& data, const DataSet& centroids);
+	/// For a given range of data, assign the centroids and return the sum of square distance
+	void assignCentroidsSubset(vector<DataPoint>& data, const vector<DataPoint>& centroids, const unsigned int first, const unsigned int last, double& sumR2);
+
+	/// Assign centroid to points and return the cost using a straight forward loop
+	double assignCentroidsBruteForce(vector<DataPoint>& data, const vector<DataPoint>& centroids);
 
 	/// Update the centroids after point assignment
-	void updateCentroids(const DataSet& data, DataSet& centroids);
-
-
-	/// Distance between the 3D points and a fixed point
-	//double squareDistance3D(const DataSet& data, const double x, const double y, const double z);
+	void updateCentroids(const vector<DataPoint>& data, vector<DataPoint>& centroids);
 
 };
 

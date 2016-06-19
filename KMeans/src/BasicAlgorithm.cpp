@@ -23,21 +23,16 @@ BasicAlgorithm::~BasicAlgorithm() {
 	// TODO Auto-generated destructor stub
 }
 
-DataSet BasicAlgorithm::findCentroids(DataSet& data, unsigned int K) {
-
+vector<DataPoint> BasicAlgorithm::findCentroids(vector<DataPoint>& data, unsigned int K) {
+	const double stop_precision = 1e-5;
 	/// Initialize the centroids
-	DataSet centroids = DataSet(K);
-	// This is not really necessary...
-	auto cen_k = centroids.getK();
-	for(std::vector<int>::size_type k = 0; k != cen_k.size(); k++) {
-		cen_k[k] = k;
-	}
-	centroids.setK(cen_k);
+	vector<DataPoint> centroids(K);
+	cout << "bla" << endl;
 
 	/// Assign random data point as centroids
 	randomCentroids(data, centroids);
 	cout << "Random centroids: " << endl;
-	centroids.print();
+	for (auto p : centroids) p.print();
 
 	/// Alternate between
 	/// (a) reassigning data to centroids and
@@ -45,12 +40,12 @@ DataSet BasicAlgorithm::findCentroids(DataSet& data, unsigned int K) {
 	/// to minimize the cost function.
 	double previousCost = 9e9;
 	double cost = 8e9;
-	while (cost < previousCost) {
+	while (cost < previousCost - stop_precision) {
 		previousCost = cost;
 
 		/// Assign centroids to data points
-		//cost = assignCentroids(data, centroids);
-		cost = assignCentroidsBruteForce(data, centroids);
+		cost = assignCentroids(data, centroids);
+		//cost = assignCentroidsBruteForce(data, centroids);
 		cout << "cost = " << cost << endl;
 
 		/// Update the centroids
@@ -60,10 +55,9 @@ DataSet BasicAlgorithm::findCentroids(DataSet& data, unsigned int K) {
 	return centroids;
 }
 
-void BasicAlgorithm::randomCentroids(const DataSet& data, DataSet& centroids) {
-	// TODO: getN(), return single points without returning the vector
-	auto n = data.getX().size();
-	auto K = centroids.getX().size();
+void BasicAlgorithm::randomCentroids(const vector<DataPoint>& data, vector<DataPoint>& centroids) {
+	auto n = data.size();
+	auto K = centroids.size();
 	std::random_device rd;     // only used once to initialise (seed) engine
 	std::mt19937 rng(rd());
 	std::uniform_int_distribution<int> uni(0,n-1);
@@ -80,126 +74,122 @@ void BasicAlgorithm::randomCentroids(const DataSet& data, DataSet& centroids) {
 		hasDuplicate =  adjacent_find( random_idx.begin(), random_idx.end() ) != random_idx.end();
 	}
 	for (unsigned int icen = 0; icen<K; ++icen ){
-		auto x = data.getX()[random_idx[icen]];
-		auto y = data.getY()[random_idx[icen]];
-		auto z = data.getZ()[random_idx[icen]];
-		centroids.set3DPoint(x,y,z,icen);
+		auto x = data[random_idx[icen]].getX();
+		auto y = data[random_idx[icen]].getY();
+		auto z = data[random_idx[icen]].getZ();
+		centroids[icen] = DataPoint(x,y,z,icen);
 	}
 }
 
-double BasicAlgorithm::squareDistance1D(vector<double> x, double mu) {
-	/// Residual of x and mu
-	vector<double> subtracted;
-	subtracted.resize(x.size());
-	transform(x.begin(), x.end(), subtracted.begin(), bind2nd(std::minus<double>(), mu));
-
-	// Sum of distance to mu squared
-	double squaredSum = inner_product(subtracted.begin(), subtracted.end(), subtracted.begin(), 0);
-
-	return squaredSum/x.size();
-}
-
-double BasicAlgorithm::assignCentroids(DataSet& data, const DataSet& centroids) {
-	auto cen_x = centroids.getX();
-	auto cen_y = centroids.getY();
-	auto cen_z = centroids.getZ();
-	auto x = data.getX();
-	auto y = data.getY();
-	auto z = data.getZ();
-
-	/// Calculate the distance square for each point to each centroid
-	vector<double> res_best;
-	vector<int> k_best;
-	int n_data = x.size();
-	res_best.resize(n_data);
-	k_best.resize(n_data);
-	for (unsigned int icen = 0; icen<cen_x.size(); ++icen){
-		/// The most time consuming part is calculating the square of the distance (residuals).
-		/// Separate threads or mapreduce here:
-		auto res_x2 = square(subtractScalar(x, cen_x[icen]));
-		auto res_y2 = square(subtractScalar(y, cen_y[icen]));
-		auto res_z2 = square(subtractScalar(z, cen_z[icen]));
-
-		for (int i=0; i<n_data; ++i){
-			auto res_r2i = res_x2[i]+res_y2[i]+res_z2[i];
-			if ((icen==0) || (res_r2i < res_best[i])){
-				res_best[i] = res_r2i;
-				k_best[i] = icen;
-			}
-		}
-	}
-
-	/// Assign each data point to a centroid
-	data.setK(k_best);
-
-	/// Calculate the cost function and return it
-	double cost = accumulate(res_best.begin(), res_best.end(), 0.)/n_data;
-	return cost;
-}
-
-double BasicAlgorithm::assignCentroidsBruteForce(DataSet& data, const DataSet& centroids) {
-	auto cen_x = centroids.getX();
-	auto cen_y = centroids.getY();
-	auto cen_z = centroids.getZ();
-	auto x = data.getX();
-	auto y = data.getY();
-	auto z = data.getZ();
-	auto n_data = x.size();
-
-	/// Calculate the distance square for each point to each centroid
-	vector<double> res_best;
-	vector<int> k_best;
-	res_best.resize(n_data);
-	k_best.resize(n_data);
-
-	vector<thread> threads(4);
-
-	for (int i=0; i<n_data; ++i){
+void BasicAlgorithm::assignCentroidsSubset(vector<DataPoint>& data, const vector<DataPoint>& centroids,
+		const unsigned int first, const unsigned int last, double& sumR2) {
+	double partialSumR2 = 0;
+	for (unsigned int i=first; i<last; ++i){
+		auto x = data[i].getX();
+		auto y = data[i].getY();
+		auto z = data[i].getZ();
 		double smallestR2 = 1e9;
-		for (unsigned int icen = 0; icen<cen_x.size(); ++icen){
-			double r2 = (x[i]-cen_x[icen])*(x[i]-cen_x[icen])
-					  + (y[i]-cen_y[icen])*(y[i]-cen_y[icen])
-					  + (z[i]-cen_z[icen])*(z[i]-cen_z[icen]);
+		int k_best = -1;
+		for ( auto cen : centroids) {
+			double r2 = (x-cen.getX())*(x-cen.getX())
+					  + (y-cen.getY())*(y-cen.getY())
+					  + (z-cen.getZ())*(z-cen.getZ());
 			if (r2 < smallestR2) {
 				smallestR2 = r2;
-				k_best[i] = icen;
+				k_best = cen.getK();
 			}
 		}
-		res_best[i] = smallestR2;
+		/// Assign the data point to a centroid
+		data[i].setK(k_best);
+		partialSumR2 += smallestR2;
 	}
-	/// Assign each data point to a centroid
-	data.setK(k_best);
-
-	/// Calculate the cost function and return it
-	double cost = accumulate(res_best.begin(), res_best.end(), 0.)/n_data;
-	return cost;
+	sumR2 += partialSumR2;
 }
 
-void BasicAlgorithm::updateCentroids(const DataSet& data, DataSet& centroids) {
+double BasicAlgorithm::assignCentroids(vector<DataPoint>& data, const vector<DataPoint>& centroids) {
+
+	/// Calculate the distance square for each point to each centroid
+	auto n_data = data.size();
+	double sumR2 = 0;
+	const size_t nthreads = thread::hardware_concurrency();
+	vector<double> partialSumR2;
+	vector<thread> threads;
+	partialSumR2.resize(nthreads,0);
+	threads.resize(nthreads);
+	const size_t itemsPerThread = std::max(1, (int)ceil(n_data/nthreads));
+	int t = 0;
+	for (size_t nextIndex= 0; nextIndex < n_data; nextIndex += itemsPerThread)
+	{
+	    const size_t beginIndex = nextIndex;
+	    const size_t endIndex = min(nextIndex+itemsPerThread, n_data);
+	    auto f = std::bind(&BasicAlgorithm::assignCentroidsSubset, this, ref(data), ref(centroids), beginIndex, endIndex, ref(partialSumR2[t]));
+	    threads[t] = thread(f);
+
+	    // Only in c++14:
+//	    thread myThread([&, ref(data), centroids, beginIndex, endIndex, ref(sumR2)]{ this->assignCentroidsSubset(data, centroids, beginIndex, endIndex, sumR2); });
+	    ++t;
+	}
+
+    for (unsigned int t = 0; t < threads.size(); ++t) {
+    	threads[t].join();
+    	sumR2 += partialSumR2[t];
+    }
+
+	/// Calculate the cost function and return it
+	return sumR2/n_data;
+}
+
+double BasicAlgorithm::assignCentroidsBruteForce(vector<DataPoint>& data, const vector<DataPoint>& centroids) {
+
+	/// Calculate the distance square for each point to each centroid
+	auto n_data = data.size();
+	double sumR2 = 0;
+
+	for (unsigned int i=0; i<n_data; ++i){
+		auto x = data[i].getX();
+		auto y = data[i].getY();
+		auto z = data[i].getZ();
+		double smallestR2 = 1e9;
+		int k_best = -1;
+		for ( auto cen : centroids) {
+			double r2 = (x-cen.getX())*(x-cen.getX())
+					  + (y-cen.getY())*(y-cen.getY())
+					  + (z-cen.getZ())*(z-cen.getZ());
+			if (r2 < smallestR2) {
+				smallestR2 = r2;
+				k_best = cen.getK();
+			}
+		}
+		/// Assign the data point to a centroid
+		data[i].setK(k_best);
+		sumR2 += smallestR2;
+	}
+
+	/// Calculate the cost function and return it
+	return sumR2/n_data;
+}
+
+void BasicAlgorithm::updateCentroids(const vector<DataPoint>& data, vector<DataPoint>& centroids) {
 	/// Brute force method:
-	auto n = data.getK().size();
-	auto K = centroids.getX().size();
-	auto x = data.getX();
-	auto y = data.getY();
-	auto z = data.getZ();
-	auto k = data.getK();
-	vector<double> sumX, sumY, sumZ, aveX, aveY, aveZ;
+	auto K = centroids.size();
+
+	vector<double> sumX, sumY, sumZ;
 	vector<int> n_in_k;
 	sumX.resize(K, 0.); sumY.resize(K, 0.); sumZ.resize(K, 0.);
 	n_in_k.resize(K, 0);
-	for (unsigned int i = 0; i<n; ++i) {
-		sumX[k[i]] += x[i];
-		sumY[k[i]] += y[i];
-		sumZ[k[i]] += z[i];
-		n_in_k[k[i]]++;
+	for ( auto p : data ) {
+		auto k = p.getK();
+		sumX[k] += p.getX();
+		sumY[k] += p.getY();
+		sumZ[k] += p.getZ();
+		n_in_k[k]++;
 	}
 	/// Divide by number of elements in k to get the mean
-	transform (sumX.begin(), sumX.end(), n_in_k.begin(), back_inserter(aveX), divides<double>());
-	transform (sumY.begin(), sumY.end(), n_in_k.begin(), back_inserter(aveY), divides<double>());
-	transform (sumZ.begin(), sumZ.end(), n_in_k.begin(), back_inserter(aveZ), divides<double>());
-	centroids.setX(aveX);
-	centroids.setY(aveY);
-	centroids.setZ(aveZ);
+	for (unsigned int icen = 0; icen<K; ++icen) {
+		centroids[icen].setX(sumX[icen]/n_in_k[icen]);
+		centroids[icen].setY(sumY[icen]/n_in_k[icen]);
+		centroids[icen].setZ(sumZ[icen]/n_in_k[icen]);
+	}
 }
 // eof
 

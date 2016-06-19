@@ -16,6 +16,7 @@
 #include <algorithm>
 
 #include "DataSet.h"
+#include "DataPoint.h"
 #include "BasicAlgorithm.h"
 
 using namespace std;
@@ -33,22 +34,27 @@ vector<string> readFileToVector(const string& filename)
     return lines;
 }
 
-void writeResults(const DataSet data, const string& filename)
+vector<DataPoint> parseData(vector<string>& input) {
+	vector<DataPoint> data;
+	data.resize(input.size());
+	double x, y, z;
+	for (unsigned int irow=0; irow<input.size(); ++irow){
+		stringstream iss(input[irow]);
+		iss >> x >> y >> z;
+		data[irow] = DataPoint(x, y, z, -1);
+	}
+	return data;
+}
+
+void writeResults(const vector<DataPoint>& data, const string& filename)
 {
 	ofstream file;
 	file.open(filename);
 
-	auto x = data.getX();
-	auto y = data.getY();
-	auto z = data.getZ();
-	auto k = data.getK();
-
-	for (unsigned int irow = 0; irow < k.size(); ++irow ) {
-		file << x[irow] << " "
-				<< y[irow] << " "
-				<< z[irow] << " "
-				<< k[irow] << endl;
+	for (auto p : data) {
+		file << p.getX() << " " << p.getY() << " "<< p.getZ() << " " << p.getK() << endl;
 	}
+	file.close();
 }
 
 int main(int argc,  char **argv){
@@ -63,7 +69,10 @@ int main(int argc,  char **argv){
 		string sw = argv[optind];
 		if (sw=="--help") {
 			optind++;
-			cout << "This is a help message" << endl;
+			cout << "Usage: KMeans /path/to/input.txt K" << endl;
+			cout << "Returns: copy of input file with an additional column indicating assigned cluster." << endl;
+			cout << "Cluster centroids are printed to screen." << endl;
+			cout << "The parameter K indicates how many clusters should used." << endl;
 			exit(EXIT_SUCCESS);
 		} else {
 			cout << "Unknown switch: " << argv[optind] << endl;
@@ -74,7 +83,9 @@ int main(int argc,  char **argv){
 
 	string filename(argv[1]);
 	auto v_rows = readFileToVector(filename);
-	DataSet dataSet = DataSet(v_rows);
+	vector<DataPoint> data = parseData(v_rows);
+	cout << "My data point " ;
+	data[0].print();
 
 	// TODO: Throw exception if K not given as input
 	unsigned int K = 0;
@@ -87,10 +98,10 @@ int main(int argc,  char **argv){
 	}
 
 	BasicAlgorithm basic;
-	DataSet centroids = basic.findCentroids(dataSet, K);
+	vector<DataPoint> centroids = basic.findCentroids(data, K);
 	cout << "Final centroids: " << endl;
-	centroids.print();
-	writeResults(dataSet, "results.txt");
+	for (auto p : centroids) p.print();
+	writeResults(data, "results.txt");
 
 	return 0;
 }
